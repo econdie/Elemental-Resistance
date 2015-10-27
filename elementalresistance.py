@@ -1,6 +1,7 @@
 # Elemental Resistance
 import pygame
 import random
+import time
 
 WIDTH = 1280
 HEIGHT = 720
@@ -58,7 +59,30 @@ class Player(pygame.sprite.Sprite):
 		if self.rect.top < 0:
 			self.rect.top = 0
 		if self.rect.bottom > 600:
-			self.rect.bottom = 600
+			self.rect.bottom = 600	
+
+	def initiateWater(self):
+		self.status = 'water'
+		self.image.fill(BLUE)
+		
+	def initiateGather(self):
+		self.status = 'gather'
+		self.image.fill(GREEN)
+		for i in range(8):
+			raindrop = Raindrop()
+			all_sprites.add(raindrop)
+			all_raindrops.add(raindrop)
+
+	def initiateSupernova(self):
+		supernova = SupernovaMob()
+		all_sprites.add(supernova)
+		all_supernovas.add(supernova)
+
+	def initiateLight(self):
+		self.status = 'light'
+		self.image.fill(WHITE)
+
+
 
 class ElementMob(pygame.sprite.Sprite):
 	def __init__(self):
@@ -77,6 +101,29 @@ class FireMob(ElementMob):
 	def update(self):
 		pass
 
+class SupernovaMob(ElementMob):
+	def __init__(self):
+		pygame.sprite.Sprite.__init__(self)
+		self.explosionTimer = time.clock()
+		self.image = pygame.Surface((30, 30))
+		self.image.fill(WHITE)
+		self.rect = self.image.get_rect()
+		self.rect.x = random.randrange(0, WIDTH - self.rect.width)
+		self.rect.top = random.randrange(0, HEIGHT - 100)
+		
+
+	def update(self):
+	 	if time.clock() - self.explosionTimer > 5:
+	 		explosion = pygame.sprite.spritecollide(player, all_supernovas, False)
+	 		if explosion:
+	 			lightResource.light += 1000
+	 			self.kill()
+	 		else:
+	 			pygame.quit()
+	 		
+	 	
+
+
 class PlayerResources(pygame.sprite.Sprite):
 	def __init__(self):
 		pygame.sprite.Sprite.__init__(self)
@@ -85,20 +132,33 @@ class WaterResource(PlayerResources):
 	def __init__(self):
 		pygame.sprite.Sprite.__init__(self)
 		self.water = 0
-		font = pygame.font.Font(None, 24)
-		font_color = (200,200,200)
-		font_background = (0, 0, 0)
-		self.image = font.render(str(self.water), True, font_color, font_background)
+		self.font = pygame.font.Font(None, 24)
+		self.font_color = (200,200,200)
+		self.font_background = (0, 0, 0)
+		self.image = self.font.render(str(self.water), True, self.font_color, self.font_background)
 		self.rect = self.image.get_rect()
 		self.rect.centerx = 100
 		self.rect.centery = 100
 		
 
 	def update(self):
-		font = pygame.font.Font(None, 24)
-		font_color = (200,200,200)
-		font_background = (0, 0, 0)
-		self.image = font.render(str(self.water), True, font_color, font_background)
+		self.image = self.font.render(str(self.water), True, self.font_color, self.font_background)
+
+class LightResource(PlayerResources):
+	def __init__(self):
+		pygame.sprite.Sprite.__init__(self)
+		self.light = 0
+		self.font = pygame.font.Font(None, 24)
+		self.font_color = (200,200,200)
+		self.font_background = (0, 0, 0)
+		self.image = self.font.render(str(self.light), True, self.font_color, self.font_background)
+		self.rect = self.image.get_rect()
+		self.rect.centerx = 100
+		self.rect.centery = 200
+
+	def update(self):
+		self.image = self.font.render(str(self.light), True, self.font_color, self.font_background)
+
 
 class Raindrop(pygame.sprite.Sprite):
 	def __init__(self):
@@ -117,10 +177,17 @@ class Raindrop(pygame.sprite.Sprite):
 			self.rect.y = random.randrange(-100, -40)
 			self.speedy = random.randrange(1, 8)
 
+		if player.status != 'gather':
+			for raindrops in all_raindrops:
+				if raindrops.rect.y > HEIGHT:
+					raindrops.kill()
+
+
 all_sprites = pygame.sprite.Group()
 all_resources = pygame.sprite.Group()
 all_fireMobs = pygame.sprite.Group()
 all_raindrops = pygame.sprite.Group()
+all_supernovas = pygame.sprite.Group()
 
 # Initiate game
 player = Player()
@@ -133,11 +200,12 @@ all_sprites.add(fireMob)
 waterResource = WaterResource()
 all_sprites.add(waterResource)
 all_resources.add(waterResource)
+lightResource = LightResource()
+all_sprites.add(lightResource)
+all_resources.add(lightResource)
 
-for i in range(8):
-	raindrop = Raindrop()
-	all_sprites.add(raindrop)
-	all_raindrops.add(raindrop)
+player.initiateGather()
+counter = 0
 
 # Game loop
 running = True
@@ -149,18 +217,49 @@ while running:
 		# check for closing window
 		if event.type == pygame.QUIT:
 			running = False
+		elif event.type == pygame.KEYDOWN:
+			if event.key == pygame.K_w:
+				player.initiateWater()
+				player.initiateSupernova()
+			elif event.key == pygame.K_e:
+				player.initiateGather()
+			elif event.key == pygame.K_r:
+				player.initiateLight()
+				# initiate black bullets that come horizontally
+				
+				
+				
 	# Update
 	all_sprites.update()
+	counter += 0.3
+	if player.status == 'light':
+		if lightResource.light > 0:
+			counter -= 0.6
+			lightResource.light -= 1
 
-	waterGather = pygame.sprite.spritecollide(player, all_raindrops, True)
-	for hits in waterGather:
-		raindrop = Raindrop()
-		all_sprites.add(raindrop)
-		all_raindrops.add(raindrop)
-		waterResource.water += 1
-		
+	if player.status == 'gather':
+		waterGather = pygame.sprite.spritecollide(player, all_raindrops, True)
+		for hits in waterGather:
+			raindrop = Raindrop()
+			all_sprites.add(raindrop)
+			all_raindrops.add(raindrop)
+			waterResource.water += 1
+	
+	elif player.status == 'water':
+		waterUsage = pygame.sprite.spritecollide(player, all_fireMobs, True)
+		for hits in waterUsage:
+			if waterResource.water >= 10:
+				waterResource.water -= 10
+			else:
+				running = False
+		pass
 	# Draw / render
-	screen.fill(BLACK)
+	if counter <= 255 and counter >= 0:
+		screen.fill((255 - counter, 255 - counter, 255 - counter))
+	elif counter <= 255: 
+		screen.fill((255, 255, 255))
+	else:
+		running = False
 	all_sprites.draw(screen)
 	# after drawing everything, flip the display
 	pygame.display.flip()
